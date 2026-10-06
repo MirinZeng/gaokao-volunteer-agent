@@ -12,3 +12,4 @@ frontend/dist/
 *.xlsx
 *.xls
 *.pdf
+!江西-2025高报数据参考-家长版.xlsx
