@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gaokao-volunteer-agent"
+version = "0.1.0"
+description = "基于江西高考志愿 Excel 数据的 LangChain 混合检索 RAG Agent"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "faiss-cpu>=1.9,<2",
+  "jieba>=0.42.1,<1",
+  "langchain>=1.0,<2",
+  "langchain-core>=1.0,<2",
+  "langchain-deepseek>=1.0,<2",
+  "langchain-openai>=1.0,<2",
+  "numpy>=1.26,<3",
+  "openpyxl>=3.1,<4",
+  "pydantic-settings>=2.7,<3",
+  "python-dotenv>=1.0,<2",
+  "rich>=13,<15",
+  "tenacity>=9,<10",
+  "typer>=0.15,<1",
+  "uvicorn[standard]>=0.34,<1",
+  "zhipuai>=2.1,<3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10"]
+
+[project.scripts]
+gaokao-agent = "gaokao_agent.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["gaokao_agent*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

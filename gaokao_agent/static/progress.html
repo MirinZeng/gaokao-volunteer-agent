@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Embedding 索引进度</title>
+<style>
+  :root{
+    --bg:#0f1420; --panel:#171e2e; --panel2:#1e2739;
+    --line:#2b364d; --text:#e8edf7; --muted:#8b9ab5;
+    --accent:#4f8cff; --accent2:#22d3a6; --warn:#f5a524; --danger:#ef4d6b;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;padding:28px;background:radial-gradient(1200px 600px at 20% -10%,#1b2540,#0f1420 60%);
+    color:var(--text);font:15px/1.55 "Segoe UI","Microsoft YaHei",system-ui,sans-serif;
+    min-height:100vh;
+  }
+  .wrap{max-width:980px;margin:0 auto}
+  header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px;flex-wrap:wrap}
+  h1{font-size:20px;margin:0;font-weight:650;letter-spacing:.2px}
+  h1 small{display:block;font-size:12.5px;color:var(--muted);font-weight:400;margin-top:4px}
+  .badge{
+    display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:999px;
+    font-size:13px;font-weight:600;border:1px solid transparent;white-space:nowrap;
+  }
+  .badge .dot{width:8px;height:8px;border-radius:50%;background:currentColor}
+  .badge.running{color:var(--accent2);background:rgba(34,211,166,.1);border-color:rgba(34,211,166,.3)}
+  .badge.running .dot{animation:pulse 1.3s ease-in-out infinite}
+  .badge.finished{color:var(--accent);background:rgba(79,140,255,.12);border-color:rgba(79,140,255,.35)}
+  .badge.paused{color:var(--warn);background:rgba(245,165,36,.1);border-color:rgba(245,165,36,.3)}
+  .badge.idle{color:var(--muted);background:rgba(139,154,181,.1);border-color:rgba(139,154,181,.25)}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.8)}}
+
+  .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:16px;padding:22px;margin-bottom:18px}
+  .hero{display:flex;align-items:flex-end;gap:20px;flex-wrap:wrap;margin-bottom:16px}
+  .pct{font-size:52px;font-weight:700;line-height:1;letter-spacing:-1.5px;font-variant-numeric:tabular-nums}
+  .pct span{font-size:22px;color:var(--muted);font-weight:500;margin-left:2px}
+  .hero .sub{color:var(--muted);font-size:13.5px;padding-bottom:6px}
+  .hero .sub b{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
+
+  .bar{height:16px;border-radius:999px;background:#0c111c;border:1px solid var(--line);overflow:hidden;position:relative}
+  .bar i{
+    display:block;height:100%;width:0;border-radius:999px;
+    background:linear-gradient(90deg,#2f6fe4,#4f8cff 45%,#22d3a6);
+    transition:width .5s cubic-bezier(.4,0,.2,1);
+    box-shadow:0 0 18px rgba(79,140,255,.5);
+  }
+  .bar i::after{
+    content:"";position:absolute;inset:0;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,.28),transparent);
+    animation:shine 2.2s linear infinite;
+  }
+  @keyframes shine{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-top:20px}
+  .stat{background:#121a29;border:1px solid var(--line);border-radius:11px;padding:13px 15px}
+  .stat .k{font-size:11.5px;color:var(--muted);letter-spacing:.4px;text-transform:uppercase}
+  .stat .v{font-size:20px;font-weight:650;margin-top:5px;font-variant-numeric:tabular-nums}
+  .stat .v em{font-size:12.5px;color:var(--muted);font-style:normal;font-weight:500;margin-left:3px}
+
+  .chart-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+  .chart-head h2{font-size:14px;margin:0;font-weight:600;color:var(--muted);letter-spacing:.3px}
+  .chart-head span{font-size:12px;color:var(--muted)}
+  svg{width:100%;height:190px;display:block}
+  .empty{color:var(--muted);font-size:13.5px;text-align:center;padding:46px 0}
+
+  .note{color:var(--muted);font-size:12.5px;text-align:center;margin-top:6px}
+  .note code{background:#121a29;padding:2px 7px;border-radius:5px;color:#a9bde0;font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Embedding 索引进度<small id="modelLine">正在读取…</small></h1>
+    <div class="badge idle" id="badge"><span class="dot"></span><span id="badgeText">连接中</span></div>
+  </header>
+
+  <div class="card">
+    <div class="hero">
+      <div class="pct" id="pct">—<span>%</span></div>
+      <div class="sub" id="countLine">— / —</div>
+    </div>
+    <div class="bar"><i id="barFill"></i></div>
+    <div class="grid">
+      <div class="stat"><div class="k">速率</div><div class="v" id="rate">—<em>条/秒</em></div></div>
+      <div class="stat"><div class="k">预计剩余</div><div class="v" id="eta">—</div></div>
+      <div class="stat"><div class="k">已完成</div><div class="v" id="done">—</div></div>
+      <div class="stat"><div class="k">总量</div><div class="v" id="total">—</div></div>
+      <div class="stat"><div class="k">向量维度</div><div class="v" id="dim">—</div></div>
+      <div class="stat"><div class="k">切块大小</div><div class="v" id="chunk">—<em>字符</em></div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="chart-head">
+      <h2>已完成条数随时间变化</h2>
+      <span id="window">最近 5 分钟</span>
+    </div>
+    <svg id="chart" viewBox="0 0 900 190" preserveAspectRatio="none"></svg>
+    <div class="empty" id="chartEmpty" style="display:none">正在采集数据点…</div>
+  </div>
+
+  <div class="note">每 2 秒自动刷新 · 数据源 <code>/api/ingest-progress</code> · 读取 <code>embedding_checkpoint.json</code></div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let lastCompleted = null;
+
+function fmtDuration(seconds){
+  if (seconds === null || seconds === undefined || !isFinite(seconds)) return '—';
+  seconds = Math.max(0, Math.round(seconds));
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${h}小时${m}分`;
+  if (m > 0) return `${m}分${s}秒`;
+  return `${s}秒`;
+}
+const num = (n) => (n === null || n === undefined) ? '—' : n.toLocaleString('en-US');
+
+function drawChart(history){
+  const svg = $('chart');
+  const empty = $('chartEmpty');
+  if (!history || history.length < 2){
+    svg.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  const W = 900, H = 190, padL = 8, padR = 8, padT = 16, padB = 22;
+  const xs = history.map(p => p.t);
+  const ys = history.map(p => p.done);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const spanX = (maxX - minX) || 1;
+  const spanY = (maxY - minY) || 1;
+
+  const px = (t) => padL + (t - minX) / spanX * (W - padL - padR);
+  const py = (d) => H - padB - (d - minY) / spanY * (H - padT - padB);
+
+  const points = history.map(p => [px(p.t), py(p.done)]);
+  const line = points.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+  const area = line + ` L${points[points.length-1][0].toFixed(1)} ${H-padB} L${points[0][0].toFixed(1)} ${H-padB} Z`;
+  const last = points[points.length-1];
+
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="fill" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#4f8cff" stop-opacity=".38"/>
+        <stop offset="100%" stop-color="#4f8cff" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="stroke" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#4f8cff"/><stop offset="100%" stop-color="#22d3a6"/>
+      </linearGradient>
+    </defs>
+    ${[0,1,2,3].map(i => {
+      const y = padT + i * (H - padT - padB) / 3;
+      return `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="#2b364d" stroke-width="1"/>`;
+    }).join('')}
+    <path d="${area}" fill="url(#fill)"/>
+    <path d="${line}" fill="none" stroke="url(#stroke)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="5" fill="#22d3a6"/>
+    <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="10" fill="#22d3a6" opacity=".22"/>
+    <text x="${padL}" y="${H-4}" fill="#8b9ab5" font-size="12">${Math.round(minX)}s 前</text>
+    <text x="${W-padR}" y="${H-4}" fill="#8b9ab5" font-size="12" text-anchor="end">现在</text>
+  `;
+}
+
+async function tick(){
+  try{
+    const res = await fetch('/api/ingest-progress', {cache:'no-store'});
+    const d = await res.json();
+
+    const badge = $('badge');
+    const map = {
+      running:['running','正在构建'], finished:['finished','已完成'],
+      paused:['paused','已暂停'], idle:['idle','尚未开始'],
+    };
+    const [cls, text] = map[d.state] || map.idle;
+    badge.className = 'badge ' + cls;
+    $('badgeText').textContent = text;
+
+    $('pct').innerHTML = `${d.percent.toFixed(1)}<span>%</span>`;
+    $('countLine').innerHTML = `<b>${num(d.completed)}</b> / <b>${num(d.total)}</b> 条`;
+    $('barFill').style.width = Math.min(100, d.percent) + '%';
+    $('rate').innerHTML = `${d.rate ? d.rate.toFixed(2) : '—'}<em>条/秒</em>`;
+    $('eta').textContent = d.state === 'finished' ? '已完成' : fmtDuration(d.eta_seconds);
+    $('done').textContent = num(d.completed);
+    $('total').textContent = num(d.total);
+    $('dim').textContent = d.dimension ? d.dimension : '—';
+    $('chunk').innerHTML = `${d.chunk_chars}<em>字符</em>`;
+    $('modelLine').textContent =
+      `${d.backend === 'bge_m3' ? '本地 bge-m3（GPU，免费）' : '智谱 embedding-3（云端）'}`
+      + (d.model ? ` · ${d.model}` : '')
+      + ' · 纯本地切块 + 向量平均池化，每条文档一个向量';
+
+    drawChart(d.history);
+    lastCompleted = d.completed;
+  }catch(err){
+    $('badge').className = 'badge paused';
+    $('badgeText').textContent = '后端未连接';
+  }
+}
+tick();
+setInterval(tick, 2000);
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+.venv/
+.env
+.pytest_cache/
+.idea/
+__pycache__/
+*.py[cod]
+*.egg-info/
+data/index/
+data/memory.sqlite3*
+frontend/node_modules/
+frontend/dist/
+*.xlsx
+*.xls
+*.pdf
